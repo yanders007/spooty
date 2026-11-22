@@ -1,7 +1,7 @@
 # ============================================
 # Stage 1: Build
 # ============================================
-FROM node:18.20.4-alpine AS builder
+FROM node:20-alpine AS builder
 WORKDIR /spooty
 
 # Copy package files first for better layer caching
@@ -18,7 +18,7 @@ RUN npm run build
 # ============================================
 # Stage 2: Production
 # ============================================
-FROM node:18.20.4-alpine
+FROM node:20-alpine
 WORKDIR /spooty
 
 # Install runtime dependencies
