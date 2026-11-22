@@ -1,0 +1,53 @@
+services:
+  spooty:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: spooty
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - DB_PATH=./config/db.sqlite
+      - FE_PATH=../frontend/browser
+      - DOWNLOADS_PATH=./downloads
+      - FORMAT=mp3
+      - PORT=3000
+      - REDIS_PORT=6379
+      - REDIS_HOST=redis
+      - REDIS_RUN=false
+    volumes:
+      - spooty-downloads:/spooty/dist/backend/downloads
+      - spooty-db:/spooty/dist/backend/config
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - spooty-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: spooty-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - redis-data:/data
+    networks:
+      - spooty-net
+
+volumes:
+  spooty-downloads:
+    driver: local
+  spooty-db:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  spooty-net:
+    driver: bridge

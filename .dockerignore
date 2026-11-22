@@ -1,0 +1,14 @@
+node_modules
+dist
+.git
+.github
+assets
+*.md
+!README.md
+.vscode
+.idea
+.release-it.json
+.auto-changelog
+.czrc
+coverage
+*.log
