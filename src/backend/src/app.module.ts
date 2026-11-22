@@ -47,6 +47,11 @@ import { BullModule } from '@nestjs/bullmq';
       useFactory: async (configService: ConfigService) => ({
         defaultJobOptions: {
           removeOnComplete: true,
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 3000,
+          },
         },
         connection: {
           host: configService.get<string>(EnvironmentEnum.REDIS_HOST),

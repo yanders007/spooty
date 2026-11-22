@@ -5,6 +5,8 @@ import { TrackEntity, TrackStatusEnum } from './track.entity';
 import { PlaylistEntity } from '../playlist/playlist.entity';
 import { ConfigService } from '@nestjs/config';
 import { resolve } from 'path';
+import * as path from 'path';
+import * as fs from 'fs';
 import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server } from 'socket.io';
 import { EnvironmentEnum } from '../environmentEnum';
@@ -82,56 +84,77 @@ export class TrackService {
   }
 
   async findOnYoutube(track: TrackEntity): Promise<void> {
-    if (!(await this.get(track.id))) {
+    const currentTrack = await this.get(track.id);
+    if (!currentTrack) {
       return;
     }
-    await this.update(track.id, {
-      ...track,
+    await this.update(currentTrack.id, {
       status: TrackStatusEnum.Searching,
     });
-    let updatedTrack: TrackEntity;
     try {
       const youtubeUrl = await this.youtubeService.findOnYoutubeOne(
-        track.artist,
-        track.name,
+        currentTrack.artist,
+        currentTrack.name,
       );
-      updatedTrack = { ...track, youtubeUrl, status: TrackStatusEnum.Queued };
-    } catch (err) {
-      this.logger.error(err);
-      updatedTrack = {
-        ...track,
-        error: String(err),
-        status: TrackStatusEnum.Error,
+      const updatedTrack: Partial<TrackEntity> = {
+        youtubeUrl,
+        status: TrackStatusEnum.Queued,
+        error: undefined,
       };
+      await this.update(currentTrack.id, updatedTrack);
+      // ONLY add to download queue when search succeeded
+      await this.trackDownloadQueue.add('', { ...currentTrack, ...updatedTrack }, {
+        jobId: `dl-${currentTrack.id}`,
+      });
+    } catch (err: any) {
+      this.logger.error(
+        `Search error for ${currentTrack.artist} - ${currentTrack.name}: ${err?.message || err}`,
+      );
+      await this.update(currentTrack.id, {
+        error: String(err?.message || err),
+        status: TrackStatusEnum.Error,
+      });
     }
-    await this.trackDownloadQueue.add('', updatedTrack, {
-      jobId: `id-${updatedTrack.id}`,
-    });
-    await this.update(track.id, updatedTrack);
   }
 
   async downloadFromYoutube(track: TrackEntity): Promise<void> {
-    if (!(await this.get(track.id))) {
+    const currentTrack = await this.get(track.id);
+    if (!currentTrack) {
       return;
     }
-    await this.update(track.id, {
-      ...track,
+    if (!currentTrack.youtubeUrl) {
+      this.logger.warn(
+        `Track ${currentTrack.id} missing YouTube URL, skipping download`,
+      );
+      await this.update(currentTrack.id, {
+        status: TrackStatusEnum.Error,
+        error: 'Missing YouTube URL',
+      });
+      return;
+    }
+    await this.update(currentTrack.id, {
       status: TrackStatusEnum.Downloading,
     });
-    let error: string;
+    let error: string | undefined;
     try {
-      const folderName = this.getFolderName(track, track.playlist);
-      await this.youtubeService.downloadAndFormat(track, folderName);
-    } catch (err) {
-      this.logger.error(err);
-      error = String(err);
+      const playlist = currentTrack.playlist || track.playlist;
+      const folderName = this.getFolderName(currentTrack, playlist);
+      const dir = path.dirname(folderName);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      await this.youtubeService.downloadAndFormat(currentTrack, folderName);
+    } catch (err: any) {
+      this.logger.error(
+        `Download error for track ${currentTrack.id}: ${err?.message || err}`,
+      );
+      error = String(err?.message || err);
     }
-    const updatedTrack = {
-      ...track,
+    const updatedTrack: Partial<TrackEntity> = {
       status: error ? TrackStatusEnum.Error : TrackStatusEnum.Completed,
-      ...(error ? { error } : {}),
+      ...(error ? { error } : { error: undefined }),
     };
-    await this.update(track.id, updatedTrack);
+    await this.update(currentTrack.id, updatedTrack);
   }
 
   getTrackFileName(track: TrackEntity): string {
@@ -139,9 +162,10 @@ export class TrackService {
     return `${this.utilsService.stripFileIllegalChars(fileName)}.${this.configService.get<string>(EnvironmentEnum.FORMAT)}`;
   }
 
-  getFolderName(track: TrackEntity, playlist: PlaylistEntity): string {
+  getFolderName(track: TrackEntity, playlist?: PlaylistEntity): string {
+    const playlistName = playlist?.name || 'default';
     return resolve(
-      this.utilsService.getPlaylistFolderPath(playlist.name),
+      this.utilsService.getPlaylistFolderPath(playlistName),
       this.getTrackFileName(track),
     );
   }

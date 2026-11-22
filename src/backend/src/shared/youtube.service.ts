@@ -26,30 +26,55 @@ export class YoutubeService {
   constructor(private readonly configService: ConfigService) {}
 
   async findOnYoutubeOne(artist: string, name: string): Promise<string> {
-    this.logger.debug(`Searching ${artist} - ${name} on YT`);
-    const url = (await yts(`${artist} - ${name}`)).videos[0].url;
-    this.logger.debug(`Found ${artist} - ${name} on ${url}`);
-    return url;
+    const query = `${artist} - ${name}`;
+    this.logger.debug(`Searching "${query}" on YT`);
+    const searchResult = await yts(query);
+    const video = searchResult?.videos?.[0];
+    if (!video || !video.url) {
+      throw new Error(`No YouTube video found for "${query}"`);
+    }
+    this.logger.debug(`Found "${query}" -> ${video.url}`);
+    return video.url;
   }
 
   downloadAndFormat(track: TrackEntity, folderName: string): Promise<void> {
-    this.logger.debug(`Downloading ${track.artist} - ${track.name} (${track.youtubeUrl}) from YT`);
+    this.logger.debug(
+      `Downloading ${track.artist} - ${track.name} (${track.youtubeUrl}) from YT`,
+    );
     return new Promise((res, reject) => {
-      ffmpeg(this.getYoutubeAudio(track.youtubeUrl, reject))
+      let isSettled = false;
+      const cleanupAndReject = (err: any) => {
+        if (isSettled) return;
+        isSettled = true;
+        if (fs.existsSync(folderName)) {
+          try {
+            fs.unlinkSync(folderName);
+          } catch {}
+        }
+        reject(err);
+      };
+
+      const outStream = fs.createWriteStream(folderName);
+      outStream.on(StreamStates.Finish, () => {
+        if (!isSettled) {
+          isSettled = true;
+          this.logger.debug(
+            `Downloaded ${track.artist} - ${track.name} to ${folderName}`,
+          );
+          res();
+        }
+      });
+      outStream.on(StreamStates.Error, (err) => cleanupAndReject(err));
+
+      const audioStream = this.getYoutubeAudio(track.youtubeUrl, (err) =>
+        cleanupAndReject(err),
+      );
+
+      ffmpeg(audioStream)
         .outputOptions(...this.getFfmpegOptions(track.name, track.artist))
         .format(this.configService.get<string>(EnvironmentEnum.FORMAT))
-        .on(StreamStates.Error, (err) => reject(err))
-        .pipe(
-          fs
-            .createWriteStream(folderName)
-            .on(StreamStates.Finish, () => {
-              this.logger.debug(
-                `Downloaded ${track.artist} - ${track.name} to ${folderName}`,
-              );
-              res();
-            })
-            .on(StreamStates.Error, (err) => reject(err)),
-        );
+        .on(StreamStates.Error, (err) => cleanupAndReject(err))
+        .pipe(outStream);
     });
   }
 
