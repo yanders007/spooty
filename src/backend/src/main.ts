@@ -24,7 +24,10 @@ async function bootstrap() {
   try {
     const redisRun = process.env[EnvironmentEnum.REDIS_RUN];
     if (redisRun === 'true' || redisRun === '1') {
-      exec(`redis-server --port ${process.env[EnvironmentEnum.REDIS_PORT]}`);
+      const redisPort = process.env[EnvironmentEnum.REDIS_PORT] || '6379';
+      exec(`redis-server --port ${redisPort} --daemonize yes --protected-mode no`);
+      // Give redis time to initialize before Nest and BullMQ connect
+      await new Promise((r) => setTimeout(r, 1500));
     }
   } catch (e) {
     console.error('Unable to run redis server from app:', e);

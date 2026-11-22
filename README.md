@@ -4,6 +4,8 @@
 [![GitHub License](https://img.shields.io/github/license/raiper34/spooty)](https://github.com/Raiper34/spooty)
 [![GitHub Repo stars](https://img.shields.io/github/stars/raiper34/spooty)](https://github.com/Raiper34/spooty)
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/yanders007/spooty)
+
 ![spooty logo](assets/logo.svg)
 # Spooty - selfhosted Spotify downloader
 Spooty is a self-hosted Spotify downloader.
