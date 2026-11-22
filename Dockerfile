@@ -22,7 +22,7 @@ FROM node:20-alpine
 WORKDIR /spooty
 
 # Install runtime dependencies
-RUN apk add --no-cache ffmpeg redis curl \
+RUN apk add --no-cache ffmpeg redis curl python3 yt-dlp \
     && addgroup -S spooty && adduser -S spooty -G spooty
 
 # Copy built app and dependencies
