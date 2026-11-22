@@ -56,7 +56,11 @@ export class TrackService {
   }
 
   async create(track: TrackEntity, playlist?: PlaylistEntity): Promise<void> {
-    const savedTrack = await this.repository.save({ ...track, playlist });
+    const savedTrack = await this.repository.save({
+      ...track,
+      createdAt: track.createdAt || Date.now(),
+      playlist,
+    });
     await this.trackSearchQueue.add('', savedTrack, {
       jobId: `id-${savedTrack.id}`,
     });
@@ -66,7 +70,7 @@ export class TrackService {
     });
   }
 
-  async update(id: number, track: TrackEntity): Promise<void> {
+  async update(id: number, track: Partial<TrackEntity>): Promise<void> {
     await this.repository.update(id, track);
     this.io.emit(WsTrackOperation.Update, track);
   }

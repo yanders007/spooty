@@ -71,7 +71,10 @@ export class PlaylistService {
   }
 
   async save(playlist: PlaylistEntity): Promise<PlaylistEntity> {
-    const savedPlaylist = await this.repository.save(playlist);
+    const savedPlaylist = await this.repository.save({
+      ...playlist,
+      createdAt: playlist.createdAt || Date.now(),
+    });
     this.io.emit(WsPlaylistOperation.New, savedPlaylist);
     return savedPlaylist;
   }
