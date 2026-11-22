@@ -1,4 +1,4 @@
-<a class="panel-block is-flex is-justify-content-space-between" *ngFor="let track of tracks$ | async">
+<div class="panel-block is-flex is-justify-content-space-between" *ngFor="let track of tracks$ | async">
   <div>
     <span>{{ track.artist }} - {{ track.name }}</span>&nbsp;
     <a [href]="track.spotifyUrl"
@@ -12,7 +12,7 @@
       <i class="fa-brands fa-youtube"></i>
     </a>&nbsp;
     <a *ngIf="track.status === trackStatuses.Completed"
-       href="api/track/download/{{track.id}}"
+       href="/api/track/download/{{track.id}}"
        class="has-text-info"
        title="Download downloaded and locally saved file"
        download>
@@ -31,4 +31,4 @@
       <span *ngSwitchCase="trackStatuses.Error" class="tag is-danger" [title]="track.error">Error</span>
     </ng-container>
   </div>
-</a>
+</div>

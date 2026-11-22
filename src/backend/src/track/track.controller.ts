@@ -2,12 +2,13 @@ import {
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   Res,
   StreamableFile,
 } from '@nestjs/common';
 import { TrackService } from './track.service';
-import { createReadStream } from 'fs';
+import { createReadStream, existsSync } from 'fs';
 import type { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { TrackEntity } from './track.entity';
@@ -30,11 +31,19 @@ export class TrackController {
     @Param('id') id: number,
   ): Promise<StreamableFile> {
     const track = await this.service.get(id);
+    if (!track) {
+      throw new NotFoundException(`Track with id ${id} not found`);
+    }
+    const filePath = this.service.getFolderName(track, track.playlist);
+    if (!existsSync(filePath)) {
+      throw new NotFoundException(`File not found: ${filePath}`);
+    }
     const fileName = this.service.getTrackFileName(track);
-    const readStream = createReadStream(
-      this.service.getFolderName(track, track.playlist),
-    );
-    res.set({ 'Content-Disposition': `attachment; filename="${fileName}"` });
+    const readStream = createReadStream(filePath);
+    res.set({
+      'Content-Type': 'audio/mpeg',
+      'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+    });
     return new StreamableFile(readStream);
   }
 
